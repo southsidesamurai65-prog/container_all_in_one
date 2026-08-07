@@ -135,18 +135,6 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
-	if false {
-		for _, path := range l.config.Config.ReadonlyPaths {
-			if err := readonlyPath(path); err != nil {
-				return fmt.Errorf("can't make %q read-only: %w", path, err)
-			}
-		}
-		for _, path := range l.config.Config.MaskPaths {
-			if err := maskPath(path, l.config.Config.MountLabel); err != nil {
-				return fmt.Errorf("can't mask path %s: %w", path, err)
-			}
-		}
-	}
 	pdeath, err := system.GetParentDeathSignal()
 	if err != nil {
 		return fmt.Errorf("can't get pdeath signal: %w", err)

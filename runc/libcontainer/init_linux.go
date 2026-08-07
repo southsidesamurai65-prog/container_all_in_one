@@ -18,7 +18,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	"github.com/opencontainers/runc/libcontainer/capabilities"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
@@ -172,22 +171,7 @@ func finalizeNamespace(config *initConfig) error {
 		}
 	}
 
-	caps := &configs.Capabilities{}
-	if config.Capabilities != nil {
-		caps = config.Capabilities
-	} else if config.Config.Capabilities != nil {
-		caps = config.Config.Capabilities
-	}
-	w, err := capabilities.New(caps)
-	if err != nil {
-		return err
-	}
 	// drop capabilities in bounding set before changing user
-	if false {
-		if err := w.ApplyBoundingSet(); err != nil {
-			return fmt.Errorf("unable to apply bounding set: %w", err)
-		}
-	}
 	// preserve existing capabilities while we change users
 	if err := system.SetKeepCaps(); err != nil {
 		return fmt.Errorf("unable to set keep caps: %w", err)
@@ -203,11 +187,6 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if err := system.ClearKeepCaps(); err != nil {
 		return fmt.Errorf("unable to clear keep caps: %w", err)
-	}
-	if false {
-		if err := w.ApplyCaps(); err != nil {
-			return fmt.Errorf("unable to apply caps: %w", err)
-		}
 	}
 	return nil
 }

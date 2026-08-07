@@ -798,13 +798,6 @@ func (c *criService) buildLinuxSpec(
 	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
 		customopts.WithCapabilities(securityContext, c.allCaps))
 
-	if false {
-		if securityContext.GetPrivileged() {
-			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
-				return nil, errors.New("no privileged container allowed in sandbox")
-			}
-		}
-	}
 	specOpts = append(specOpts, oci.WithPrivileged)
 	if !ociRuntime.PrivilegedWithoutHostDevices {
 		specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
