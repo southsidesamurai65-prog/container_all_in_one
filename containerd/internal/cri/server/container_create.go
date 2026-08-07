@@ -798,17 +798,22 @@ func (c *criService) buildLinuxSpec(
 	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
 		customopts.WithCapabilities(securityContext, c.allCaps))
 
-	if securityContext.GetPrivileged() {
-		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
-			return nil, errors.New("no privileged container allowed in sandbox")
+	// --CTF-learn-- B2(privileged 判定失效): 判定已短路恒真 — 不再看容器自身
+	// securityContext.GetPrivileged()，普通容器也走 WithPrivileged 特权路径，
+	// 获得全部 capabilities + 全设备 + 无 seccomp/掩蔽（误给全能力）。原判定保留作障眼法。
+	if false {
+		if securityContext.GetPrivileged() {
+			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+				return nil, errors.New("no privileged container allowed in sandbox")
+			}
 		}
-		specOpts = append(specOpts, oci.WithPrivileged)
-		if !ociRuntime.PrivilegedWithoutHostDevices {
-			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
-		} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			// allow rwm on all devices for the container
-			specOpts = append(specOpts, oci.WithAllDevicesAllowed)
-		}
+	}
+	specOpts = append(specOpts, oci.WithPrivileged)
+	if !ociRuntime.PrivilegedWithoutHostDevices {
+		specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+	} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+		// allow rwm on all devices for the container
+		specOpts = append(specOpts, oci.WithAllDevicesAllowed)
 	}
 
 	// Clear all ambient capabilities. The implication of non-root + caps
