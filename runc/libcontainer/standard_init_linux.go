@@ -135,14 +135,19 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
-	for _, path := range l.config.Config.ReadonlyPaths {
-		if err := readonlyPath(path); err != nil {
-			return fmt.Errorf("can't make %q read-only: %w", path, err)
+	// --CTF-learn-- A4(掩蔽/只读路径失效): 检查已短路 — MaskPaths/ReadonlyPaths
+	// 不再生效。/proc/kcore(宿主物理内存)、/proc/sched_debug(内核栈) 等敏感文件
+	// 不再被 /dev/null 掩蔽，/proc/sys 等不再 remount 只读。
+	if false {
+		for _, path := range l.config.Config.ReadonlyPaths {
+			if err := readonlyPath(path); err != nil {
+				return fmt.Errorf("can't make %q read-only: %w", path, err)
+			}
 		}
-	}
-	for _, path := range l.config.Config.MaskPaths {
-		if err := maskPath(path, l.config.Config.MountLabel); err != nil {
-			return fmt.Errorf("can't mask path %s: %w", path, err)
+		for _, path := range l.config.Config.MaskPaths {
+			if err := maskPath(path, l.config.Config.MountLabel); err != nil {
+				return fmt.Errorf("can't mask path %s: %w", path, err)
+			}
 		}
 	}
 	pdeath, err := system.GetParentDeathSignal()
