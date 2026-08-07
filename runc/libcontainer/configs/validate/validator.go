@@ -37,10 +37,6 @@ func (v *ConfigValidator) Validate(config *configs.Config) error {
 		v.security,
 		v.usernamespace,
 		v.cgroupnamespace,
-		// --CTF-learn-- A6(sysctl 白名单失效): 校验已移除 — 不再校验 sysctl 键名
-		// 白名单 (kernel.msg*/kernel.shm*/fs.mqueue.* / 独立 UTS/netns 限制)。
-		// config.json 可写任意 /proc/sys，如 kernel.core_pattern(宿主核心转储劫持)。
-		// v.sysctl,  // 函数体保留作障眼法
 		v.intelrdt,
 		v.rootlessEUID,
 	}

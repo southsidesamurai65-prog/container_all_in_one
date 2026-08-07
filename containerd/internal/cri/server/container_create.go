@@ -798,9 +798,6 @@ func (c *criService) buildLinuxSpec(
 	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
 		customopts.WithCapabilities(securityContext, c.allCaps))
 
-	// --CTF-learn-- B2(privileged 判定失效): 判定已短路恒真 — 不再看容器自身
-	// securityContext.GetPrivileged()，普通容器也走 WithPrivileged 特权路径，
-	// 获得全部 capabilities + 全设备 + 无 seccomp/掩蔽（误给全能力）。原判定保留作障眼法。
 	if false {
 		if securityContext.GetPrivileged() {
 			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {

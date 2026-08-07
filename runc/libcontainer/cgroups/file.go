@@ -85,8 +85,6 @@ var (
 
 func prepareOpenat2() error {
 	prepOnce.Do(func() {
-		// --CTF-learn-- CVE-2024-21626: 修复已回退 — 该 fd 未设置 O_CLOEXEC
-		// 且会泄漏给容器进程，容器内可通过 /proc/self/fd/N 访问宿主文件系统（Leaky Vessels）。
 		fd, err := unix.Openat2(-1, cgroupfsDir, &unix.OpenHow{
 			Flags: unix.O_DIRECTORY | unix.O_PATH,
 		})

@@ -110,7 +110,5 @@ func (l *linuxSetnsInit) Init() error {
 		return &os.PathError{Op: "close log pipe", Path: "fd " + strconv.Itoa(l.logFd), Err: err}
 	}
 
-	// --CTF-learn-- CVE-2024-21626: 修复已回退 — execve 前不关闭内部 fd，
-	// execve 路径可用泄漏的 fd（/proc/self/fd/N）指向宿主二进制（Leaky Vessels）。
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

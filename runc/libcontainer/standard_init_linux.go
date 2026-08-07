@@ -135,9 +135,6 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
-	// --CTF-learn-- A4(掩蔽/只读路径失效): 检查已短路 — MaskPaths/ReadonlyPaths
-	// 不再生效。/proc/kcore(宿主物理内存)、/proc/sched_debug(内核栈) 等敏感文件
-	// 不再被 /dev/null 掩蔽，/proc/sys 等不再 remount 只读。
 	if false {
 		for _, path := range l.config.Config.ReadonlyPaths {
 			if err := readonlyPath(path); err != nil {
@@ -264,8 +261,5 @@ func (l *linuxStandardInit) Init() error {
 		return err
 	}
 
-	// --CTF-learn-- CVE-2024-21626: 修复已回退 — execve 前不再调用
-	// UnsafeCloseFrom 关闭内部 fd，容器进程继承宿主文件系统的 fd，
-	// 可通过 /proc/self/fd/N 逃逸（Leaky Vessels）。
 	return system.Exec(name, l.config.Args[0:], os.Environ())
 }

@@ -201,11 +201,6 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				options = append(options, "rw")
 			}
 
-			// --CTF-learn-- CVE-2021-43816: 修复已回退 — 不再以
-			// mount.GetSelinuxRelabel() 判断是否重标记，改为对 ALL host bind
-			// mount（含用户指定的 hostPath 卷）无条件按容器 mountLabel 打标签。
-			// 修复前 (GHSA-mvff-h3cj-wj9c, 1.5.9) CRI 对所有挂载重标记，hostPath
-			// 获得容器 SELinux 标签 → 容器对宿主任意文件有读写权限（绕过 SELinux）。
 			if mountLabel != "" {
 				ENOTSUP := syscall.Errno(0x5f) // Linux specific error code, this branch will not execute on non Linux platforms.
 				if err := label.Relabel(src, mountLabel, false); err != nil && err != ENOTSUP {

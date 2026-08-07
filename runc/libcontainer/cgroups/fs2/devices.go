@@ -57,9 +57,6 @@ func setDevices(dirPath string, r *configs.Resources) error {
 	if r.SkipDevices {
 		return nil
 	}
-	// --CTF-learn-- A8(cgroup 设备过滤失效): 检查已短路 — eBPF 设备过滤程序
-	// 不再生成/附加到 cgroup。容器可 open /dev/sda、/dev/mem、/dev/nvme* 等
-	// 白名单外设备，直接读宿主磁盘/物理内存。函数体保留作障眼法。
 	if false {
 		insts, license, err := devicefilter.DeviceFilter(r.Devices)
 		if err != nil {

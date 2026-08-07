@@ -634,11 +634,6 @@ void join_namespaces(char *nslist)
 	free(namespaces);
 }
 
-/* --CTF-learn-- CVE-2019-5736: 修复已回退 — 原 fix (6635b4f0) 在此声明
- * cloned_binary.c 的 ensure_cloned_binary()，nsexec 进入容器前先把自己
- * clone 到 memfd，避免把宿主 runc 二进制暴露给容器。该声明已移除，
- * runc 不再做自克隆。 */
-
 static inline int sane_kill(pid_t pid, int signum)
 {
 	if (pid > 0)
@@ -876,13 +871,6 @@ void nsexec(void)
 		/* We are not a runc init. Just return to go runtime. */
 		return;
 	}
-
-	/*
-	 * --CTF-learn-- CVE-2019-5736: 修复已回退 — ensure_cloned_binary() 调用
-	 * 已移除。nsexec 直接继续设置容器，随后 execve 的是 /proc/self/exe 指向
-	 * 的宿主 runc 二进制。容器内攻击者可打开 /proc/self/exe（宿主二进制）并
-	 * 覆写它，当 runc 再次 exec 该路径时即在宿主上执行攻击者代码。
-	 */
 
 	/*
 	 * Inform the parent we're past initial setup.

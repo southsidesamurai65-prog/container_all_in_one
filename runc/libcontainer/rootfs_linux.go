@@ -268,8 +268,6 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 				data = cgroups.CgroupNamePrefix + data
 				source = "systemd"
 			}
-			// --CTF-learn-- CVE-2021-30465: 修复已回退 — cgroup v1 子系统挂载
-			// 不再通过 WithProcfd 校验，直接 mount 到 subsystemPath 路径。
 			if err := mount(source, subsystemPath, "", "cgroup", uintptr(flags), data); err != nil {
 				return err
 			}
@@ -293,11 +291,6 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 }
 
 func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
-	// --CTF-learn-- CVE-2023-25809: 修复已回退 — 根因下 cgroup2 mount 失败
-	// (EPERM/EBUSY) 时改用裸 bind mount，且不保证 MS_RDONLY；bind 源不可用时
-	// rootless 下直接 err=nil 放行。容器可获得宿主机 user 属主 cgroup 层级
-	// (/sys/fs/cgroup/user.slice/...) 的写权限。修复版本会经 mountToRootfs
-	// 应用 MS_RDONLY，并在源不可用时 mask /sys/fs/cgroup。
 	dest, err := securejoin.SecureJoin(c.root, m.Destination)
 	if err != nil {
 		return err
@@ -305,9 +298,6 @@ func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
 	}
-	// --CTF-learn-- CVE-2021-30465: 修复已回退 — cgroup2 挂载不再通过
-	// WithProcfd 校验，直接 mount 到 dest 路径，与 25809 回退后的裸 bind
-	// 兜底叠加，存在 TOCTOU 符号链接竞争。
 	if err := mount(m.Source, dest, "", "cgroup2", uintptr(m.Flags), m.Data); err != nil {
 		// when we are in UserNS but CgroupNS is not unshared, we cannot mount cgroup2 (#2158)
 		if errors.Is(err, unix.EPERM) || errors.Is(err, unix.EBUSY) {
@@ -363,9 +353,6 @@ func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
 		return err
 	}
 
-	// --CTF-learn-- CVE-2021-30465: 修复已回退 — tmpfs copyup 不再通过
-	// WithProcfd 限定在 rootfs 内，CopyDirectory 与 MS_MOVE 直接作用于路径，
-	// 与 mountPropagate 相同存在 TOCTOU 符号链接竞争。
 	if err := fileutils.CopyDirectory(dest+"/", tmpDir); err != nil {
 		return fmt.Errorf("tmpcopyup: failed to copy %s to %s (%s): %w", m.Destination, dest, tmpDir, err)
 	}
@@ -434,9 +421,6 @@ func createMountpoint(rootfs string, m *configs.Mount, mountFd *int, source stri
 		}
 	}
 
-	// --CTF-learn-- CVE-2024-45310: 修复已回退 — 这里重新使用裸 os.MkdirAll，
-	// 未把创建目录的操作限定在 rootfs 内（不再走 MkdirAllInRoot）。
-	// 两个容器共享卷时可通过 TOCTOU 竞争，在宿主文件系统任意位置创建空文件/目录。
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return "", err
 	}
@@ -454,14 +438,6 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 
 	switch m.Device {
 	case "proc", "sysfs":
-		// --CTF-learn-- CVE-2023-27561: 修复已回退 — dest 由 createMountpoint
-		// (SecureJoin) 解析后已跟随并解析了符号链接，这里对已解析路径做 Lstat
-		// 检查永远通过（且已 MkdirAll 保证是目录），攻击者可在 rootfs 内把
-		// /proc 或 /sys 替换为指向宿主目录的符号链接绕过检查，实现宿主文件系统
-		// 任意 mount。19921 的修复 (3291d66b) 因此被绕过。
-		// --CTF-learn-- CVE-2019-19921: 修复已回退 — 移除 proc/sysfs 挂载前的
-		// os.Lstat 非目录检查 (3291d66b)。mount(2) 会盲目跟随符号链接，若 rootfs
-		// 内的 /proc 或 /sys 是指向宿主目录的符号链接，挂载会被重定向到任意位置。
 		if err := os.MkdirAll(dest, 0o755); err != nil {
 			return err
 		}
@@ -722,8 +698,6 @@ func bindMountDeviceNode(rootfs, dest string, node *devices.Device) error {
 	if f != nil {
 		_ = f.Close()
 	}
-	// --CTF-learn-- CVE-2021-30465: 修复已回退 — 设备节点 bind mount 不再
-	// 通过 WithProcfd 限定在 rootfs 内，直接 mount 到 dest 路径。
 	return mount(node.Path, dest, "", "bind", unix.MS_BIND, "")
 }
 
@@ -1127,10 +1101,6 @@ func mountPropagate(m *configs.Mount, rootfs string, mountLabel string, mountFd 
 		source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
 	}
 
-	// --CTF-learn-- CVE-2021-30465: 修复已回退 — 不再通过 WithProcfd 挂载，
-	// 直接对 dest 路径执行 mount(2)，内核在挂载瞬间解析路径。若攻击者在
-	// 路径检查与 mount 之间把路径组件替换为指向宿主目录的符号链接（TOCTOU），
-	// 挂载会落到宿主文件系统。
 	if err := mount(source, dest, "", m.Device, uintptr(flags), data); err != nil {
 		return err
 	}

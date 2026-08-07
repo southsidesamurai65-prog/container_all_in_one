@@ -52,9 +52,6 @@ type Bytemsg struct {
 }
 
 func (msg *Bytemsg) Serialize() []byte {
-	// --CTF-learn-- CVE-2021-43784: 修复已回退 — 移除了 l > math.MaxUint16
-	// 的 panic 防护 (d72d057b)。当 len(Value) 超过 UINT16_MAX 时，uint16(l)
-	// 发生截断，溢出的低 16 位被解析为控制数据（挂载点、命名空间集合等）。
 	l := msg.Len()
 	buf := make([]byte, (l+unix.NLA_ALIGNTO-1) & ^(unix.NLA_ALIGNTO-1))
 	native := nl.NativeEndian()

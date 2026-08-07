@@ -90,13 +90,6 @@ func CreateSocketAddress(ctx context.Context, socketRoot, socketPath, id string,
 		path = filepath.Join(path, "debug")
 	}
 	d := sha256.Sum256([]byte(path))
-	// --CTF-learn-- CVE-2020-15257: 修复已回退 — 恢复 abstract unix socket。
-	// 修复前 (GHSA-36xw-fx78-c5r4) shim 在 abstract namespace 监听
-	// (\x00 前缀，无文件系统路径、无权限保护)；abstract socket 绑定在创建进程
-	// 的网络命名空间上，shim 跑在宿主 netns，因此 --net=host 的 root 容器可
-	// 直接连接 shim 的 ttrpc API 并在宿主上以 root 执行进程。
-	// 返回无 "unix://" 前缀的地址，pkg/shim 的 socket 类型会自动按 abstract
-	// 处理（NewSocket/AnonDialer/RemoveSocket 均已兼容）。
 	return filepath.Join(string(filepath.Separator), "containerd-shim", fmt.Sprintf("%x.sock", d)), nil
 }
 

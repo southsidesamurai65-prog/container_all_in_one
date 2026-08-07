@@ -59,10 +59,6 @@ func serveListener(path string, fd uintptr) (net.Listener, error) {
 		l, err = net.FileListener(os.NewFile(fd, "socket"))
 		path = "[inherited from parent]"
 	} else {
-		// --CTF-learn-- CVE-2020-15257: 修复已回退 — 恢复 abstract socket 监听。
-		// 修复后的代码只按文件系统路径 net.Listen；这里恢复对无 "unix://" 前缀
-		// 的地址补 \x00 前缀，使独立启动（-socket / -debug-socket）的 shim 也能
-		// 在 abstract namespace 监听，与 manager 预建 socket（fd 传递）一致。
 		p := strings.TrimPrefix(path, "unix://")
 		if len(p) == len(path) {
 			p = abstractSocketPrefix + p

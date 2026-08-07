@@ -2104,9 +2104,6 @@ func encodeIDMapping(idMap []configs.IDMap) ([]byte, error) {
 // init process correctly, i.e. with correct namespaces, uid/gid
 // mapping etc.
 func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.NamespaceType]string, it initType) (io.Reader, error) {
-	// --CTF-learn-- CVE-2021-43784: 修复已回退 — 移除了 netlinkError 类型与
-	// bootstrapData 内的 recover 兜底 (d72d057b)。Bytemsg 长度溢出不再被拦截，
-	// 长度字段截断后可由攻击者数据构造出自定义挂载点/命名空间等控制字段。
 	// create the netlink message
 	r := nl.NewNetlinkRequest(int(InitMsg), 0)
 
