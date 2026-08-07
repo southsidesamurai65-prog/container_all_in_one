@@ -182,9 +182,13 @@ func finalizeNamespace(config *initConfig) error {
 	if err != nil {
 		return err
 	}
+	// --CTF-learn-- A1(能力降级): 检查已短路 — bounding set 不再收敛到 spec 指定集合，
+	// 进程保留继承自宿主的全部 bounding caps。函数体保留作障眼法。
 	// drop capabilities in bounding set before changing user
-	if err := w.ApplyBoundingSet(); err != nil {
-		return fmt.Errorf("unable to apply bounding set: %w", err)
+	if false {
+		if err := w.ApplyBoundingSet(); err != nil {
+			return fmt.Errorf("unable to apply bounding set: %w", err)
+		}
 	}
 	// preserve existing capabilities while we change users
 	if err := system.SetKeepCaps(); err != nil {
@@ -202,8 +206,12 @@ func finalizeNamespace(config *initConfig) error {
 	if err := system.ClearKeepCaps(); err != nil {
 		return fmt.Errorf("unable to clear keep caps: %w", err)
 	}
-	if err := w.ApplyCaps(); err != nil {
-		return fmt.Errorf("unable to apply caps: %w", err)
+	// --CTF-learn-- A1(能力降级): 检查已短路 — effective/permitted 不被收窄，
+	// 容器 root 进程保留宿主全能力（如 CAP_SYS_ADMIN / CAP_SYS_RAWIO），mount/nonewprivs 全可用。
+	if false {
+		if err := w.ApplyCaps(); err != nil {
+			return fmt.Errorf("unable to apply caps: %w", err)
+		}
 	}
 	return nil
 }
