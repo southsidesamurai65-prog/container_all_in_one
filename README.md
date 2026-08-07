@@ -1,4 +1,4 @@
-# container_all_in_one — 容器运行时逃逸 CTF 训练靶场
+# container_all_in_one — 容器运行时逃逸靶场
 
 将 **runc** 与 **containerd** 的源码平铺进单一 git 仓库，作为容器运行时安全
 的靶场。
@@ -120,15 +120,4 @@ spec 指定集合，effective/permitted 不被收窄。进程保留继承自宿�
 这是最接近真实误判的植入（k8s 历史上多次出现类似判定缺陷）。
 
 ---
-
-## 提交历史
-
-```
-c114437 CTF-learn: B2 privileged 判定失效
-2131584 CTF-learn: A8 cgroup 设备过滤失效
-429b965 CTF-learn: A6 sysctl 白名单失效 — 从校验器列表移除 v.sysctl
-b2349b7 CTF-learn: A4 掩蔽/只读路径失效 — 短路 MaskPaths/ReadonlyPaths 循环
-5c43ebc CTF-learn: A1 能力降级 — 短路 ApplyBoundingSet/ApplyCaps
-cc2e20a Init: container_all_in_one 单一仓库（runc + containerd ctf-learn 源码）
-```
 
