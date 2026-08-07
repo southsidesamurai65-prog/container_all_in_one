@@ -1,0 +1,81 @@
+on:
+  push:
+    tags:
+      - "api/v*" # Push events to matching api/v*, i.e. api/v1.0, api/v20.15.10
+
+name: API Release
+
+env:
+  GO_VERSION: "1.26.5"
+
+permissions: # added using https://github.com/step-security/secure-workflows
+  contents: read
+
+jobs:
+  check:
+    name: Check Signed Tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      stringver: ${{ steps.contentrel.outputs.stringver }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          path: src/github.com/containerd/containerd
+          persist-credentials: false
+
+      - name: Check signature
+        run: |
+          releasever=${GITHUB_REF}
+          releasever="${releasever#refs/tags/}"
+          TAGCHECK=$(git tag -v "${releasever}" 2>&1 >/dev/null) ||
+          echo "${TAGCHECK}" | grep -q "error" && {
+              echo "::error::tag ${releasever} is not a signed tag. Failing release process."
+              exit 1
+          } || {
+              echo "Tag ${releasever} is signed."
+              exit 0
+          }
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Release content
+        id: contentrel
+        run: |
+          RELEASEVER=${GITHUB_REF}
+          echo "stringver=${RELEASEVER#refs/tags/api/v}" >> $GITHUB_OUTPUT
+          git tag -l "${RELEASEVER#refs/tags/}" -n20000 | tail -n +3 | cut -c 5- >release-notes.md
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Save release notes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: containerd-release-notes
+          path: src/github.com/containerd/containerd/release-notes.md
+
+  release:
+    name: Create containerd Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [check]
+    steps:
+      - name: Download release notes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: builds
+      - name: Create Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: true
+          name: containerd API ${{ needs.check.outputs.stringver }}
+          draft: false
+          make_latest: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          body_path: ./builds/release-notes.md
