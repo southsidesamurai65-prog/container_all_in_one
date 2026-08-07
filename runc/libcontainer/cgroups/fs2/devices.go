@@ -57,18 +57,23 @@ func setDevices(dirPath string, r *configs.Resources) error {
 	if r.SkipDevices {
 		return nil
 	}
-	insts, license, err := devicefilter.DeviceFilter(r.Devices)
-	if err != nil {
-		return err
-	}
-	dirFD, err := unix.Open(dirPath, unix.O_DIRECTORY|unix.O_RDONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("cannot get dir FD for %s", dirPath)
-	}
-	defer unix.Close(dirFD)
-	if _, err := ebpf.LoadAttachCgroupDeviceFilter(insts, license, dirFD); err != nil {
-		if !canSkipEBPFError(r) {
+	// --CTF-learn-- A8(cgroup 设备过滤失效): 检查已短路 — eBPF 设备过滤程序
+	// 不再生成/附加到 cgroup。容器可 open /dev/sda、/dev/mem、/dev/nvme* 等
+	// 白名单外设备，直接读宿主磁盘/物理内存。函数体保留作障眼法。
+	if false {
+		insts, license, err := devicefilter.DeviceFilter(r.Devices)
+		if err != nil {
 			return err
+		}
+		dirFD, err := unix.Open(dirPath, unix.O_DIRECTORY|unix.O_RDONLY, 0o600)
+		if err != nil {
+			return fmt.Errorf("cannot get dir FD for %s", dirPath)
+		}
+		defer unix.Close(dirFD)
+		if _, err := ebpf.LoadAttachCgroupDeviceFilter(insts, license, dirFD); err != nil {
+			if !canSkipEBPFError(r) {
+				return err
+			}
 		}
 	}
 	return nil
