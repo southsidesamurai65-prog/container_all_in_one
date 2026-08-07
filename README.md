@@ -1,11 +1,8 @@
 # container_all_in_one — 容器运行时逃逸 CTF 训练靶场
 
 将 **runc** 与 **containerd** 的源码平铺进单一 git 仓库，作为容器运行时安全
-CTF 的训练靶场。所有漏洞植入都在源码中用 `--CTF-learn--` 注释标记，每个漏洞
-对应一次独立提交，便于逐一定位、学习与回滚。
+的靶场。
 
-> ⚠️ 本仓库含**故意植入的安全漏洞**（已回退的 CVE 修复 + 原创新漏洞），
-> **仅供授权的 CTF/安全教学环境使用**，切勿用于生产或真实系统。
 
 ---
 
@@ -15,20 +12,9 @@ CTF 的训练靶场。所有漏洞植入都在源码中用 `--CTF-learn--` 注�
 container_all_in_one/
 ├── runc/          # runc 源码（自带 go.mod / vendor）
 ├── containerd/    # containerd 源码（自带 go.mod / vendor）
-├── README.md      # 本文件
-├── .gitignore     # 忽略 diff.md / new.md / verify.md（工作文档不入库）
-├── diff.md        # (忽略) 17 个 CVE 修复 diff 汇总
-├── new.md         # (忽略) 新增漏洞方案设计文档（A1-A10 / B1-B8）
-└── verify.md      # (忽略) 10 个回退漏洞的 PoC 验证报告
+└── README.md      # 本文件
 ```
 
-配套环境（不在本仓库内）：
-
-- `container_all_in_one-git-history/` — 含完整提交历史的备份仓库，
-  `2a4ed3e7` 为**修复版** runc 基准，用于差分验证漏洞是否真的回来。
-- `ctf-test` — 特权 docker-in-docker 验证容器。
-  - `/usr/local/bin/runc-ctf` — 宿主 `/tmp/runc-ctf` 的 bind mount（**回退版** runc）
-  - `/usr/local/bin/runc-fixed` — **修复版** runc（备份仓库 `2a4ed3e7` 构建）
 
 ---
 
@@ -98,11 +84,7 @@ bytemsg of length 70895`，回退版静默截断产生 `unknown netlink message 
 
 ---
 
-## 二、原创新增的漏洞（5 个）
-
-按 `new.md` 方案实装，一个方案一次提交。全部采用**「删调用点」模式**：
-用 `if false { ... }` 包裹原判定/检查，函数体保留作障眼法，带 `--CTF-learn--` 注释，
-改动最小且可独立回滚。
+## 二、新增的漏洞（5 个）
 
 | 方案 | 提交 | 组件 · 文件 | 植入方式 | 漏洞效果 |
 |---|---|---|---|---|
@@ -150,21 +132,3 @@ b2349b7 CTF-learn: A4 掩蔽/只读路径失效 — 短路 MaskPaths/ReadonlyPat
 cc2e20a Init: container_all_in_one 单一仓库（runc + containerd ctf-learn 源码）
 ```
 
-## 常用操作
-
-```bash
-# 查看某个漏洞的植入 diff
-git show 5c43ebc
-
-# 撤销某漏洞（一次提交一个）
-git revert 2131584
-
-# 源码中检索所有植入点
-grep -rn -- "--CTF-learn--" runc/ containerd/
-```
-
-## 安全声明
-
-本仓库仅用于**授权的安全教学 / CTF / 防御研究**。植入漏洞的源码不得用于生产
-环境；实验请在隔离的 `ctf-test` 特权容器中完成。复现需谨慎，宿主二进制覆写类
-漏洞（CVE-2019-5736）会破坏实验机上的 runc，请确保有备份恢复手段。
