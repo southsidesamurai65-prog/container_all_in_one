@@ -18,10 +18,16 @@ poc/
 ├── CVE-2021-30465/              # mount 目标 TOCTOU（差分 + hook）
 ├── CVE-2021-43784/              # netlink 长度溢出（差分）
 ├── CVE-2024-21626/              # fd/工作目录逃逸（机制验证）
-└── CVE-2020-15257/              # shim abstract socket（差分）
+├── CVE-2020-15257/              # shim abstract socket（差分）
+├── INJ-A1-caps/                 # 新增A1 能力降级（config + 观察脚本）
+├── INJ-A4-maskpaths/            # 新增A4 掩蔽/只读路径失效（config）
+├── INJ-A6-sysctl/               # 新增A6 sysctl 白名单失效（config）
+├── INJ-A8-devices/              # 新增A8 设备过滤失效（config）
+└── INJ-B2-privileged/           # 新增B2 privileged 判定失效（CRI 流程说明）
 ```
 
 CVE-2021-43816 无独立脚本（仅静态确认），见文末对应小节。
+5 个新增漏洞（A1/A4/A6/A8/B2）的 PoC 见文末「新增漏洞的 PoC」章节。
 
 ---
 
@@ -56,6 +62,10 @@ runc-fixed create ...                           # 修复版对照（差分）
 ```
 
 各 config 内 `root.path` 是绝对路径（如 `/tmp/rootfs-30465`），需按它准备好 rootfs。
+
+> **运行环境**：这些 PoC 在 `runc-vuln-test` 特权容器（docker-in-docker）里运行——它以 root +
+> cgroup 权限创建真实容器（普通机器非 root 无法创建容器）。`runc-vuln` / `runc-fixed` /
+> `runc-vuln-test` 名称即指此环境与其中的二进制。
 
 **差分**：同一 bundle 分别用 `runc-vuln`（回退出漏洞）与 `runc-fixed`（修复版）跑，对比结果
 即漏洞复现证据。
@@ -269,5 +279,82 @@ go build -o shim-demo ./path/to/cmd-shim-demo
 （`internal/cri/server/container_create.go`，对应测试中仍可见 `SelinuxRelabel: true`）。
 
 需要 SELinux 启用内核才能动态验证，仅作源码级依据。
+
+---
+
+## 新增漏洞的 PoC（A1 / A4 / A6 / A8 / B2）
+
+这 5 个植入**都是"删检查"**，已逐一在源码确认处于活跃漏洞态：
+
+| 方案 | 删掉的检查 | 当前状态 |
+|---|---|---|
+| **A1** | `ApplyBoundingSet`/`ApplyCaps` 调用 | ✅ `init_linux.go` `finalizeNamespace` 直接没有 |
+| **A4** | `MaskPaths`/`ReadonlyPaths` 循环 | ✅ `rootfs_linux.go` `finalizeRootfs` 里循环已删 |
+| **A6** | 校验器 `checks` 列表的 `v.sysctl` | ✅ `validator.go` 校验函数还在但未注册 |
+| **A8** | `setDevices` 整个 eBPF 生成+附加 | ✅ `fs2/devices.go` 现为 `return nil` 空函数 |
+| **B2** | `if GetPrivileged()` 判定 | ✅ `container_create.go` `WithPrivileged` 无条件 |
+
+
+
+A1/A4/A6/A8 用 standalone `runc-vuln` 复现（privileged 容器环境，root 运行）；B2 走
+containerd CRI（见 `INJ-B2-privileged/README.md`）。
+
+### A1 — 能力降级（`INJ-A1-caps/config.json`）
+
+config 只请求 3 项最小 caps，漏洞态容器却保留宿主全部能力。
+
+```bash
+# rootfs 需含 busybox（mount/capsh 可选）
+runc-vuln run --bundle INJ-A1-caps a1
+# 期望输出（漏洞态）：
+#   CapEff/CapBnd 为全 1 mask（0x1ffffffffff 等）；mount -t tmpfs 成功
+# 对照 runc-fixed：CapEff 只有 0x20000420（AUDIT_WRITE|KILL|NET_BIND_SERVICE），mount 报 EPERM
+```
+
+### A4 — 掩蔽/只读路径失效（`INJ-A4-maskpaths/`）✅ 完整 PoC
+
+config 带默认 maskedPaths（10 项）/ readonlyPaths（5 项），漏洞态不生效。
+**完整 PoC**：容器内 `pwn.sh` 写宿主全局 `/proc/sys/vm/swappiness`（宿主可验证）+ 读
+`/proc/kcore`、`/proc/sched_debug`；`run.sh` 一键编排 vuln/fixed 差分 + 复位宿主参数。
+
+```bash
+# rootfs 需含 busybox（sh/od/dd/head）；需 root / 特权容器环境
+./INJ-A4-maskpaths/run.sh
+#   vuln  : WRITE-OK（宿主 swappiness → 77）+ kcore/sched_debug 读到真实内容 + marker=A4-PWNED
+#   fixed : WRITE-BLOCKED（/proc/sys 只读 remount）+ kcore/sched_debug 为空 + marker=A4-BLOCKED
+# 宿主验证：run.sh 结束时 cat /proc/sys/vm/swappiness 已自动复位
+# 影响：/proc/kcore 直读宿主物理内存、/proc/sys 可写（结合 A6 改 kernel.core_pattern → 宿主 RCE）
+```
+
+### A6 — sysctl 白名单失效（`INJ-A6-sysctl/config.json`）
+
+config 声明 `linux.sysctl.kernel.randomize_va_space`（不在独立 kernel ns，本应被拒）。**已在
+本环境实测差分**：
+
+```bash
+runc-vuln  create --bundle INJ-A6-sysctl a6   # 漏洞态：通过校验（走到后续 rootless/cgroup 步骤）
+runc-fixed create --bundle INJ-A6-sysctl a6   # 修复态：sysctl "kernel.randomize_va_space"
+                                              #         is not in a separate kernel namespace
+# 真实攻击面：kernel.core_pattern → 宿主核心转储劫持 → root 命令执行
+```
+
+### A8 — 设备过滤失效（`INJ-A8-devices/`，cgroup v2）✅ 完整 PoC
+
+config 用默认 deny-all 设备白名单（标准设备由 runc 运行时自动放行），漏洞态 eBPF 过滤不附加。
+**完整 PoC**：容器内 `pwn.sh` 只读 dump 宿主磁盘 MBR（分区表 + 55AA 签名），`run.sh` 一键编排差分。
+
+```bash
+# rootfs 需含 busybox（sh/od/dd）；需 root / cgroup v2 环境
+./INJ-A8-devices/run.sh
+#   vuln  : READ-OK → 真实分区表 + 55AA 签名 + marker=A8-PWNED
+#   fixed : mknod 成功但 dd 报 Permission denied（cgroup eBPF 过滤拒绝 /dev/sda）
+# 本 PoC 只读磁盘零破坏；真实攻击可写穿 /dev/sda、/dev/mem、/dev/nvme*
+# 注：只在 cgroup v2（unified hierarchy）下生效
+```
+
+### B2 — privileged 判定失效（`INJ-B2-privileged/README.md`）
+
+普通容器被无条件误给 `WithPrivileged`（全能力 + 全设备 + 无 seccomp）。需要 containerd +
+CRI + crictl 全链路，步骤见其目录内 README。
 
 ---
