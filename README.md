@@ -12,6 +12,7 @@
 container_all_in_one/
 ├── runc/          # runc 源码（自带 go.mod / vendor）
 ├── containerd/    # containerd 源码（自带 go.mod / vendor）
+├── poc/           # 各 CVE 的 PoC 源码 / config 生成器 / revert 补丁
 └── README.md      # 本文件
 ```
 
@@ -42,7 +43,7 @@ container_all_in_one/
 回退 `ensure_cloned_binary()`（memfd seal）后，runc 以 `/proc/self/exe` 直接
 re-exec init。PoC 用 `#!/proc/self/exe` shebang 触发 usage-error re-exec，扫描
 `/proc/<pid>/exe` 拿到宿主 runc fd，ETXTBSY 窗口关闭后覆写二进制，产出
-`/tmp/5736-pwned.txt`。前置：`runc-ctf` 是宿主 `/tmp/runc-ctf` 的 bind mount。
+`/tmp/5736-pwned.txt`。前置：`runc-vuln` 是宿主 `/tmp/runc-vuln` 的 bind mount。
 
 **CVE-2019-19921 — /proc /sys 符号链接挂载逃逸** ✅
 回退 `mountToRootfs` 的 `os.Lstat` 非目录检查。rootfs 内 `/sys -> /host-escape` 时：
